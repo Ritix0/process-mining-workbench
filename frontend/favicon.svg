@@ -1,0 +1,10 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 256 256" width="256" height="256" role="img" aria-labelledby="pmw-favicon-title">
+  <title id="pmw-favicon-title">Process Mining Workbench</title>
+  <rect width="256" height="256" rx="56" fill="#111318"/>
+  <g transform="translate(32 32) scale(0.75)" fill="#2B7FFF">
+    <path fill-rule="evenodd" d="M 40 28 H 120 A 16 16 0 0 1 136 44 V 92 A 16 16 0 0 1 120 108 H 40 A 16 16 0 0 1 24 92 V 44 A 16 16 0 0 1 40 28 Z M 48 52 V 84 H 112 V 52 Z"/>
+    <rect x="120" y="148" width="112" height="80" rx="16"/>
+    <path d="M 136 56 H 184 A 20 20 0 0 1 204 76 V 108 H 222 L 192 138 L 162 108 H 180 V 80 H 136 Z"/>
+    <path d="M 120 200 H 72 A 20 20 0 0 1 52 180 V 148 H 34 L 64 118 L 94 148 H 76 V 176 H 120 Z"/>
+  </g>
+</svg>

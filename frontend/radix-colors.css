@@ -1,0 +1,193 @@
+/* Radix Colors 12-Step Semantic System in OKLCH Color Space */
+:root {
+  /* Slate Scale (Cool Blue-Gray, H: 255) */
+  --slate-1:  oklch(0.992 0.005 255);
+  --slate-2:  oklch(0.975 0.007 255);
+  --slate-3:  oklch(0.945 0.010 255);
+  --slate-4:  oklch(0.920 0.012 255);
+  --slate-5:  oklch(0.885 0.015 255);
+  --slate-6:  oklch(0.840 0.018 255);
+  --slate-7:  oklch(0.770 0.020 255);
+  --slate-8:  oklch(0.690 0.022 255);
+  --slate-9:  oklch(0.550 0.030 255);
+  --slate-10: oklch(0.500 0.028 255);
+  --slate-11: oklch(0.430 0.020 255);
+  --slate-12: oklch(0.180 0.015 255);
+
+  /* Sapphire Scale (Tech Blue Primary, H: 250) */
+  --sapphire-1:  oklch(0.990 0.012 250);
+  --sapphire-2:  oklch(0.970 0.025 250);
+  --sapphire-3:  oklch(0.935 0.045 250);
+  --sapphire-4:  oklch(0.895 0.070 250);
+  --sapphire-5:  oklch(0.840 0.100 250);
+  --sapphire-6:  oklch(0.765 0.135 250);
+  --sapphire-7:  oklch(0.675 0.170 250);
+  --sapphire-8:  oklch(0.585 0.205 250);
+  --sapphire-9:  oklch(0.530 0.230 250);
+  --sapphire-10: oklch(0.480 0.215 250);
+  --sapphire-11: oklch(0.410 0.180 250);
+  --sapphire-12: oklch(0.210 0.090 250);
+
+  /* Emerald Scale (Success / Start, H: 155) */
+  --emerald-1:  oklch(0.990 0.015 155);
+  --emerald-2:  oklch(0.970 0.030 155);
+  --emerald-3:  oklch(0.935 0.055 155);
+  --emerald-6:  oklch(0.765 0.155 155);
+  --emerald-9:  oklch(0.540 0.215 155);
+  --emerald-11: oklch(0.400 0.160 155);
+  --emerald-12: oklch(0.200 0.080 155);
+
+  /* Amber Scale (Warning / Bottleneck, H: 80) */
+  --amber-1:  oklch(0.992 0.020 80);
+  --amber-2:  oklch(0.975 0.040 80);
+  --amber-3:  oklch(0.945 0.070 80);
+  --amber-6:  oklch(0.810 0.165 80);
+  --amber-9:  oklch(0.760 0.180 80);
+  --amber-11: oklch(0.440 0.140 80);
+  --amber-12: oklch(0.230 0.080 80);
+
+  /* Ruby Scale (Danger / Finish, H: 25) */
+  --ruby-1:  oklch(0.990 0.015 25);
+  --ruby-2:  oklch(0.970 0.030 25);
+  --ruby-3:  oklch(0.935 0.060 25);
+  --ruby-6:  oklch(0.750 0.180 25);
+  --ruby-9:  oklch(0.540 0.250 25);
+  --ruby-11: oklch(0.420 0.190 25);
+  --ruby-12: oklch(0.210 0.095 25);
+
+  /* Shared Motion Curve (Defined in :root for both Light & Dark themes) */
+  --ease-out: cubic-bezier(0.22, 1, 0.36, 1);
+  --ease-in-out: cubic-bezier(0.77, 0, 0.175, 1);
+  --ease-drawer: cubic-bezier(0.22, 1, 0.36, 1);
+}
+
+/* Dark Mode Overrides */
+.dark {
+  /* Slate Dark Scale */
+  --slate-1:  oklch(0.130 0.010 255);
+  --slate-2:  oklch(0.165 0.012 255);
+  --slate-3:  oklch(0.205 0.015 255);
+  --slate-4:  oklch(0.245 0.018 255);
+  --slate-5:  oklch(0.290 0.020 255);
+  --slate-6:  oklch(0.350 0.022 255);
+  --slate-7:  oklch(0.420 0.024 255);
+  --slate-8:  oklch(0.500 0.026 255);
+  --slate-9:  oklch(0.620 0.030 255);
+  --slate-10: oklch(0.680 0.028 255);
+  --slate-11: oklch(0.760 0.018 255);
+  --slate-12: oklch(0.960 0.008 255);
+
+  /* Sapphire Dark Scale */
+  --sapphire-1:  oklch(0.140 0.030 250);
+  --sapphire-2:  oklch(0.180 0.050 250);
+  --sapphire-3:  oklch(0.230 0.080 250);
+  --sapphire-4:  oklch(0.285 0.115 250);
+  --sapphire-5:  oklch(0.345 0.145 250);
+  --sapphire-6:  oklch(0.420 0.175 250);
+  --sapphire-7:  oklch(0.500 0.205 250);
+  --sapphire-8:  oklch(0.580 0.230 250);
+  --sapphire-9:  oklch(0.620 0.230 250);
+  --sapphire-10: oklch(0.680 0.210 250);
+  --sapphire-11: oklch(0.770 0.150 250);
+  --sapphire-12: oklch(0.940 0.045 250);
+
+  /* Emerald Dark Scale */
+  --emerald-1:  oklch(0.140 0.035 155);
+  --emerald-2:  oklch(0.180 0.055 155);
+  --emerald-3:  oklch(0.230 0.085 155);
+  --emerald-6:  oklch(0.420 0.180 155);
+  --emerald-9:  oklch(0.640 0.215 155);
+  --emerald-11: oklch(0.780 0.145 155);
+  --emerald-12: oklch(0.940 0.045 155);
+
+  /* Amber Dark Scale */
+  --amber-1:  oklch(0.145 0.035 80);
+  --amber-2:  oklch(0.190 0.060 80);
+  --amber-3:  oklch(0.245 0.095 80);
+  --amber-6:  oklch(0.445 0.185 80);
+  --amber-9:  oklch(0.750 0.180 80);
+  --amber-11: oklch(0.820 0.140 80);
+  --amber-12: oklch(0.950 0.045 80);
+
+  /* Ruby Dark Scale */
+  --ruby-1:  oklch(0.140 0.035 25);
+  --ruby-2:  oklch(0.185 0.060 25);
+  --ruby-3:  oklch(0.235 0.095 25);
+  --ruby-6:  oklch(0.430 0.205 25);
+  --ruby-9:  oklch(0.610 0.245 25);
+  --ruby-11: oklch(0.780 0.160 25);
+  --ruby-12: oklch(0.945 0.045 25);
+}
+
+/* Browser Surfaces & Design System Tokens */
+::selection {
+  background-color: var(--sapphire-4);
+  color: var(--slate-12);
+}
+
+:focus-visible {
+  outline: 2px solid var(--sapphire-9);
+  outline-offset: 2px;
+}
+
+.tabular-nums {
+  font-variant-numeric: tabular-nums;
+}
+
+* {
+  scrollbar-width: thin;
+  scrollbar-color: var(--slate-6) transparent;
+}
+
+::-webkit-scrollbar {
+  width: 6px;
+  height: 6px;
+}
+
+::-webkit-scrollbar-track {
+  background: transparent;
+}
+
+::-webkit-scrollbar-thumb {
+  background: var(--slate-6);
+  border-radius: 4px;
+}
+
+::-webkit-scrollbar-thumb:hover {
+  background: var(--slate-7);
+}
+
+/* Quiet Tactile Micro-Interactions on Single Ease-Out Curve */
+button, a.inline-flex, a.flex, .btn-tactile {
+  transition: transform 150ms var(--ease-out), background-color 150ms var(--ease-out), border-color 150ms var(--ease-out), color 150ms var(--ease-out);
+}
+
+button:active, a.inline-flex:active, a.flex:active, .btn-tactile:active {
+  transform: scale(0.98);
+}
+
+/* Modal and Drawer Physics */
+.drawer-transition {
+  transition: transform 220ms var(--ease-drawer);
+}
+
+.modal-enter {
+  opacity: 0;
+  transform: translateY(6px) scale(0.98);
+  transition: opacity 180ms var(--ease-out), transform 180ms var(--ease-out);
+}
+
+.modal-enter-active {
+  opacity: 1;
+  transform: translateY(0) scale(1);
+}
+
+/* Reduced Motion for Vestibular Sensitivity */
+@media (prefers-reduced-motion: reduce) {
+  *, *::before, *::after {
+    animation-duration: 0.01ms !important;
+    animation-iteration-count: 1 !important;
+    transition-duration: 0.01ms !important;
+    scroll-behavior: auto !important;
+  }
+}

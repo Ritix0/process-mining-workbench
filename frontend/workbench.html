@@ -1,0 +1,417 @@
+<!DOCTYPE html>
+<html lang="ru" class="dark">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Workbench: Реконструкция графов процессов</title>
+  
+  <link rel="icon" type="image/svg+xml" href="favicon.svg?v=10">
+  <link rel="stylesheet" href="radix-colors.css">
+  <script>
+    (function() {
+      const saved = localStorage.getItem('theme');
+      if (saved === 'light') {
+        document.documentElement.classList.remove('dark');
+      } else {
+        document.documentElement.classList.add('dark');
+      }
+    })();
+  </script>
+  <script src="libs/tailwind.min.js"></script>
+  <script src="libs/cytoscape.min.js"></script>
+  <script src="libs/dagre.min.js"></script>
+  <script src="libs/cytoscape-dagre.min.js"></script>
+
+  <script>
+    tailwind.config = {
+      darkMode: 'class',
+      theme: {
+        extend: {
+          colors: {
+            app: {
+              bg: 'var(--slate-1)',
+              subtle: 'var(--slate-2)',
+              card: 'var(--slate-3)',
+              hover: 'var(--slate-4)',
+              borderSubtle: 'var(--slate-6)',
+              border: 'var(--slate-7)',
+              borderHover: 'var(--slate-8)',
+              primary: 'var(--sapphire-9)',
+              primaryHover: 'var(--sapphire-10)',
+              textMuted: 'var(--slate-11)',
+              text: 'var(--slate-12)',
+            }
+          }
+        }
+      }
+    }
+  </script>
+
+  <style>
+    body {
+      background-color: var(--slate-1);
+      color: var(--slate-12);
+      font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
+    }
+    #cy {
+      width: 100%;
+      height: 100%;
+      position: absolute;
+      top: 0;
+      left: 0;
+      z-index: 1;
+    }
+    .canvas-grid {
+      background-color: var(--slate-1);
+      background-image: radial-gradient(var(--slate-6) 1.2px, transparent 1.2px);
+      background-size: 24px 24px;
+    }
+    .custom-scrollbar::-webkit-scrollbar {
+      width: 5px;
+      height: 5px;
+    }
+    .custom-scrollbar::-webkit-scrollbar-track {
+      background: transparent;
+    }
+    .custom-scrollbar::-webkit-scrollbar-thumb {
+      background: var(--slate-6);
+      border-radius: 3px;
+    }
+    .custom-scrollbar::-webkit-scrollbar-thumb:hover {
+      background: var(--slate-7);
+    }
+    input[type=range] {
+      accent-color: var(--sapphire-9);
+    }
+  </style>
+</head>
+<body class="h-screen w-screen overflow-hidden flex flex-col select-none">
+
+  <!-- ==================== SINGLE UNIFIED CLEAN NAVBAR ==================== -->
+  <header class="h-14 border-b border-[var(--slate-6)] bg-[var(--slate-1)]/95 backdrop-blur-sm flex items-center justify-between px-3 sm:px-5 z-30 shrink-0 gap-2">
+    
+    <!-- Left: Back link, Sidebar toggle & Project Info -->
+    <div class="flex items-center gap-2 sm:gap-3 shrink-0">
+      <button onclick="toggleSidebar()" id="btn-toggle-sidebar" class="lg:hidden w-9 h-9 rounded-lg bg-[var(--slate-2)] hover:bg-[var(--slate-3)] border border-[var(--slate-6)] text-[var(--slate-12)] flex items-center justify-center" aria-label="Открыть или скрыть панель управления" title="Панель фильтров">
+        <svg class="w-4 h-4" fill="none" stroke="currentColor" stroke-width="1.5" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" d="M4 6h16M4 12h16M4 18h16"/></svg>
+      </button>
+
+      <a href="index.html" class="inline-flex items-center gap-1.5 px-2.5 h-8 rounded-lg bg-[var(--slate-2)] hover:bg-[var(--slate-3)] border border-[var(--slate-6)] text-xs font-medium text-[var(--slate-11)] hover:text-[var(--slate-12)]" title="Вернуться на главную страницу">
+        <svg class="w-3.5 h-3.5" fill="none" stroke="currentColor" stroke-width="1.5" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" d="M10 19l-7-7m0 0l7-7m-7 7h18"/></svg>
+        <span class="hidden sm:inline">На главную</span>
+      </a>
+
+      <div class="h-4 w-[1px] bg-[var(--slate-6)] hidden sm:block"></div>
+
+      <!-- Brand Logo (Unified with Landing) -->
+      <a href="index.html" class="flex items-center gap-2.5 hover:opacity-90" title="На главную страницу">
+        <div class="w-8 h-8 rounded-lg bg-[var(--slate-2)] border border-[var(--slate-6)] flex items-center justify-center text-[var(--sapphire-9)] shrink-0">
+          <svg class="w-5 h-5" viewBox="0 0 256 256" fill="currentColor" aria-hidden="true">
+            <path fill-rule="evenodd" d="M 40 28 H 120 A 16 16 0 0 1 136 44 V 92 A 16 16 0 0 1 120 108 H 40 A 16 16 0 0 1 24 92 V 44 A 16 16 0 0 1 40 28 Z M 48 52 V 84 H 112 V 52 Z"/>
+            <rect x="120" y="148" width="112" height="80" rx="16"/>
+            <path d="M 136 56 H 184 A 20 20 0 0 1 204 76 V 108 H 222 L 192 138 L 162 108 H 180 V 80 H 136 Z"/>
+            <path d="M 120 200 H 72 A 20 20 0 0 1 52 180 V 148 H 34 L 64 118 L 94 148 H 76 V 176 H 120 Z"/>
+          </svg>
+        </div>
+        <div class="flex flex-col">
+          <h1 class="font-semibold text-sm tracking-tight text-[var(--slate-12)] leading-tight">Process Mining Workbench</h1>
+          <span class="text-[11px] text-[var(--slate-11)] font-mono hidden md:inline">ВятГУ • Кафедра ЭВМ • ИВТб-4302</span>
+        </div>
+      </a>
+    </div>
+
+    <!-- Center: Preset Selector Pills (Scrollable on small screens) -->
+    <div class="overflow-x-auto custom-scrollbar flex items-center py-1">
+      <div class="flex items-center gap-1 bg-[var(--slate-2)] p-1 rounded-xl border border-[var(--slate-6)] text-xs shrink-0">
+        <button onclick="loadPreset('1c_erp')" id="btn-preset-1c_erp" class="preset-btn px-3 h-8 rounded-lg font-medium text-[var(--slate-11)] hover:text-[var(--slate-12)]">
+          1С:ERP Заказы
+        </button>
+        <button onclick="loadPreset('servicedesk')" id="btn-preset-servicedesk" class="preset-btn px-3 h-8 rounded-lg font-medium text-[var(--slate-11)] hover:text-[var(--slate-12)]">
+          Service Desk
+        </button>
+        <button onclick="loadPreset('bank_loan')" id="btn-preset-bank_loan" class="preset-btn px-3 h-8 rounded-lg font-medium text-[var(--slate-11)] hover:text-[var(--slate-12)]">
+          Банк (Кредиты)
+        </button>
+        <button onclick="loadPreset('ieee_xes')" id="btn-preset-ieee_xes" class="preset-btn px-3 h-8 rounded-lg font-medium text-[var(--slate-11)] hover:text-[var(--slate-12)]">
+          Эталонный XES
+        </button>
+      </div>
+    </div>
+
+    <!-- Right: File Upload, Export, Theme Toggle -->
+    <div class="flex items-center gap-1.5 sm:gap-2 shrink-0">
+      <!-- Upload Log -->
+      <label class="cursor-pointer px-3 h-8 text-xs rounded-lg font-medium bg-[var(--slate-2)] hover:bg-[var(--slate-3)] border border-[var(--slate-6)] text-[var(--slate-12)] flex items-center gap-1.5" title="Загрузить журнал CSV, XES или JSON">
+        <svg class="w-4 h-4 text-[var(--slate-11)]" fill="none" stroke="currentColor" stroke-width="1.5" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-8l-4-4m0 0L8 8m4-4v12"/></svg>
+        <span class="hidden sm:inline">Импорт лога</span>
+        <span class="sm:hidden">Импорт</span>
+        <input type="file" id="file-uploader" class="hidden" accept=".csv,.xes,.json" onchange="handleFileUpload(event)">
+      </label>
+
+      <div class="h-4 w-[1px] bg-[var(--slate-6)] mx-0.5 hidden sm:block"></div>
+
+      <!-- Export BPMN -->
+      <button onclick="exportBPMN()" class="px-3 h-8 text-xs rounded-lg font-medium bg-[var(--sapphire-9)] hover:bg-[var(--sapphire-10)] text-white flex items-center gap-1.5" title="Экспорт в BPMN 2.0 XML (ISO/IEC 19510)" aria-label="Экспорт в BPMN 2.0 XML">
+        <svg class="w-4 h-4" fill="none" stroke="currentColor" stroke-width="1.5" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" d="M12 10v6m0 0l-3-3m3 3l3-3m2 8H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z"/></svg>
+        <span>BPMN</span>
+      </button>
+
+      <!-- Export PNG -->
+      <button onclick="exportPNG()" class="px-3 h-8 text-xs rounded-lg font-medium bg-[var(--slate-2)] hover:bg-[var(--slate-3)] border border-[var(--slate-6)] text-[var(--slate-12)] flex items-center gap-1.5" title="Сохранить граф в PNG" aria-label="Сохранить граф в формате PNG">
+        <span>PNG</span>
+      </button>
+
+      <!-- Theme Switcher -->
+      <button onclick="toggleTheme()" id="btn-theme-toggle" class="w-8 h-8 rounded-lg bg-[var(--slate-2)] hover:bg-[var(--slate-3)] border border-[var(--slate-6)] text-[var(--slate-11)] hover:text-[var(--slate-12)] flex items-center justify-center" title="Сменить тему оформления" aria-label="Сменить тему оформления">
+        <svg id="theme-icon-sun" class="w-4 h-4 hidden" fill="none" stroke="currentColor" stroke-width="1.5" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" d="M12 3v1m0 16v1m9-9h-1M4 12H3m15.364 6.364l-.707-.707M6.343 6.343l-.707-.707m12.728 0l-.707.707M6.343 17.657l-.707.707M16 12a4 4 0 11-8 0 4 4 0 018 0z"/></svg>
+        <svg id="theme-icon-moon" class="w-4 h-4" fill="none" stroke="currentColor" stroke-width="1.5" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" d="M20.354 15.354A9 9 0 018.646 3.646 9.003 9.003 0 0012 21a9.003 9.003 0 008.354-5.646z"/></svg>
+      </button>
+    </div>
+
+  </header>
+
+  <!-- ==================== MAIN WORKSPACE ==================== -->
+  <main class="flex-1 flex overflow-hidden relative">
+
+    <!-- Mobile Backdrop for Sidebar -->
+    <div id="sidebar-backdrop" onclick="toggleSidebar(false)" class="hidden fixed inset-0 top-14 z-20 bg-black/50 lg:hidden"></div>
+
+    <!-- LEFT SIDEBAR: PROCESS SUMMARY + CONTROLS + BOTTLENECKS -->
+    <aside id="workbench-sidebar" class="w-72 border-r border-[var(--slate-6)] bg-[var(--slate-1)] flex flex-col z-20 shrink-0 custom-scrollbar overflow-y-auto drawer-transition fixed inset-y-14 left-0 -translate-x-full lg:static lg:translate-x-0">
+      
+      <!-- Panel 1: Process Summary -->
+      <div class="p-4 border-b border-[var(--slate-6)]">
+        <div class="flex items-center justify-between mb-3">
+          <h2 class="text-xs font-medium text-[var(--slate-11)]">Сводка процесса</h2>
+          <div class="flex items-center gap-1.5 text-[11px] font-mono text-[var(--slate-11)]">
+            <span class="w-1.5 h-1.5 rounded-full bg-[var(--emerald-9)]"></span>
+            <span id="engine-status">Готов</span>
+          </div>
+        </div>
+
+        <div class="grid grid-cols-2 gap-2 mb-3">
+          <div class="p-2.5 rounded-lg bg-[var(--slate-2)] border border-[var(--slate-6)]">
+            <div class="text-[11px] text-[var(--slate-11)]">Трасс в логе</div>
+            <div id="stat-cases" class="text-base font-medium font-mono tabular-nums text-[var(--slate-12)] mt-0.5">0</div>
+          </div>
+          <div class="p-2.5 rounded-lg bg-[var(--slate-2)] border border-[var(--slate-6)]">
+            <div class="text-[11px] text-[var(--slate-11)]">Всего событий</div>
+            <div id="stat-events" class="text-base font-medium font-mono tabular-nums text-[var(--slate-12)] mt-0.5">0</div>
+          </div>
+          <div class="p-2.5 rounded-lg bg-[var(--slate-2)] border border-[var(--slate-6)]">
+            <div class="text-[11px] text-[var(--slate-11)]">Медианное время</div>
+            <div id="stat-lead-time" class="text-base font-medium font-mono tabular-nums text-[var(--slate-12)] mt-0.5">0 с</div>
+          </div>
+          <div class="p-2.5 rounded-lg bg-[var(--slate-2)] border border-[var(--slate-6)]">
+            <div class="text-[11px] text-[var(--slate-11)]">Циклы возврата</div>
+            <div id="stat-rework" class="text-base font-medium font-mono tabular-nums text-[var(--slate-12)] mt-0.5">0 раз</div>
+          </div>
+        </div>
+
+        <div class="text-[11px] text-[var(--slate-11)] flex justify-between font-mono tabular-nums bg-[var(--slate-2)] px-2.5 py-1.5 rounded-lg border border-[var(--slate-6)]">
+          <span>Топология DFG</span>
+          <span><strong id="stat-nodes" class="text-[var(--slate-12)] font-medium">0</strong> вершин • <strong id="stat-edges" class="text-[var(--slate-12)] font-medium">0</strong> связей</span>
+        </div>
+      </div>
+
+      <!-- Panel 2: Noise Filtering Sliders -->
+      <div class="p-4 border-b border-[var(--slate-6)]">
+        <div class="flex items-center justify-between mb-3">
+          <h2 class="text-xs font-medium text-[var(--slate-11)]">Фильтрация шума</h2>
+        </div>
+
+        <!-- Node Threshold Slider -->
+        <div class="mb-4">
+          <div class="flex justify-between items-center text-xs mb-1.5">
+            <label for="slider-node-threshold" class="text-[var(--slate-12)] font-medium">Порог узлов</label>
+            <span id="label-node-threshold" class="font-mono tabular-nums font-medium text-[var(--slate-12)] bg-[var(--slate-2)] px-1.5 py-0.5 rounded text-[11px] border border-[var(--slate-6)]">0%</span>
+          </div>
+          <input type="range" id="slider-node-threshold" min="0" max="80" value="0" step="5" class="w-full cursor-pointer h-2 bg-[var(--slate-3)] rounded-lg" oninput="onSliderChange()" aria-label="Порог фильтрации операций" aria-valuemin="0" aria-valuemax="80" aria-valuenow="0">
+          <div class="flex justify-between text-[11px] text-[var(--slate-11)] mt-1 font-mono">
+            <span>Все операции</span>
+            <span>Частые</span>
+          </div>
+        </div>
+
+        <!-- Edge Threshold Slider -->
+        <div class="mb-3">
+          <div class="flex justify-between items-center text-xs mb-1.5">
+            <label for="slider-edge-threshold" class="text-[var(--slate-12)] font-medium">Порог связей</label>
+            <span id="label-edge-threshold" class="font-mono tabular-nums font-medium text-[var(--slate-12)] bg-[var(--slate-2)] px-1.5 py-0.5 rounded text-[11px] border border-[var(--slate-6)]">5%</span>
+          </div>
+          <input type="range" id="slider-edge-threshold" min="0" max="60" value="5" step="1" class="w-full cursor-pointer h-2 bg-[var(--slate-3)] rounded-lg" oninput="onSliderChange()" aria-label="Порог фильтрации путей прямого следования" aria-valuemin="0" aria-valuemax="60" aria-valuenow="5">
+          <div class="flex justify-between text-[11px] text-[var(--slate-11)] mt-1 font-mono">
+            <span>Все связи (0%)</span>
+            <span>Магистраль</span>
+          </div>
+        </div>
+
+        <!-- Quick Filter Buttons -->
+        <div class="grid grid-cols-3 gap-1.5 pt-1">
+          <button onclick="setFilterPreset(0, 0)" id="filter-preset-all" class="filter-preset-btn px-1.5 h-8 text-[11px] font-medium whitespace-nowrap rounded-lg bg-[var(--slate-2)] hover:bg-[var(--slate-3)] text-[var(--slate-12)] text-center border border-[var(--slate-6)]">
+            Все связи
+          </button>
+          <button onclick="setFilterPreset(0, 5)" id="filter-preset-opt" class="filter-preset-btn px-1.5 h-8 text-[11px] font-medium whitespace-nowrap rounded-lg bg-[var(--sapphire-9)] text-white text-center">
+            Оптимум 5%
+          </button>
+          <button onclick="setFilterPreset(10, 15)" id="filter-preset-main" class="filter-preset-btn px-1.5 h-8 text-[11px] font-medium whitespace-nowrap rounded-lg bg-[var(--slate-2)] hover:bg-[var(--slate-3)] text-[var(--slate-12)] text-center border border-[var(--slate-6)]">
+            Магистраль
+          </button>
+        </div>
+      </div>
+
+      <!-- Panel 3: Metric Mode (Frequency vs Duration) -->
+      <div class="p-4 border-b border-[var(--slate-6)]">
+        <h2 class="text-xs font-medium text-[var(--slate-11)] mb-2.5">Метрика на связях</h2>
+        <div class="grid grid-cols-2 gap-1 bg-[var(--slate-2)] p-1 rounded-xl border border-[var(--slate-6)]">
+          <button onclick="setMetricMode('frequency')" id="btn-mode-frequency" class="px-2.5 h-8 text-xs rounded-lg font-medium bg-[var(--slate-4)] text-[var(--slate-12)]">
+            Частота
+          </button>
+          <button onclick="setMetricMode('duration')" id="btn-mode-duration" class="px-2.5 h-8 text-xs rounded-lg font-medium text-[var(--slate-11)] hover:text-[var(--slate-12)]">
+            Длительность
+          </button>
+        </div>
+      </div>
+
+      <!-- Panel 4: Bottlenecks (Top Delays) -->
+      <div class="p-4 flex-1">
+        <div class="flex items-center justify-between mb-1.5">
+          <h2 class="text-xs font-medium text-[var(--slate-11)]">Узкие места</h2>
+          <span class="text-[11px] text-[var(--amber-11)] font-mono">Топ задержек</span>
+        </div>
+        <p class="text-[11px] text-[var(--slate-11)] mb-3">Переходы с максимальным ожиданием</p>
+        <div id="bottlenecks-list" class="space-y-2">
+          <!-- Dynamically populated -->
+        </div>
+      </div>
+
+    </aside>
+
+    <!-- CENTER GRAPH WORKSPACE -->
+    <div class="flex-1 relative h-full canvas-grid overflow-hidden">
+      
+      <!-- Cytoscape Container -->
+      <div id="cy"></div>
+
+      <!-- Floating Canvas Toolbar (Top Left, Non-overlapping with Center Vertical Spine) -->
+      <div class="absolute top-4 left-4 z-10 bg-[var(--slate-2)]/95 p-1 rounded-xl border border-[var(--slate-6)] flex items-center gap-1">
+        <button onclick="cyZoomIn()" class="w-8 h-8 rounded-lg hover:bg-[var(--slate-3)] text-[var(--slate-12)] flex items-center justify-center font-medium" title="Приблизить" aria-label="Приблизить граф">
+          <svg class="w-4 h-4" fill="none" stroke="currentColor" stroke-width="1.5" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" d="M12 6v6m0 0v6m0-6h6m-6 0H6"/></svg>
+        </button>
+        <button onclick="cyZoomOut()" class="w-8 h-8 rounded-lg hover:bg-[var(--slate-3)] text-[var(--slate-12)] flex items-center justify-center font-medium" title="Отдалить" aria-label="Отдалить граф">
+          <svg class="w-4 h-4" fill="none" stroke="currentColor" stroke-width="1.5" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" d="M18 12H6"/></svg>
+        </button>
+        <div class="h-4 w-[1px] bg-[var(--slate-6)] mx-0.5"></div>
+        <button onclick="cyFit()" class="px-2.5 h-8 rounded-lg hover:bg-[var(--slate-3)] text-xs text-[var(--slate-12)] font-medium" aria-label="Вписать схему в экран">
+          Вписать
+        </button>
+        <button onclick="cyRelayout()" class="px-2.5 h-8 rounded-lg hover:bg-[var(--slate-3)] text-xs text-[var(--slate-12)] font-medium" aria-label="Выровнять узлы графа">
+          Выровнять
+        </button>
+      </div>
+
+      <!-- Floating Legend (Top Right) -->
+      <div class="hidden sm:block absolute top-4 right-4 z-10 bg-[var(--slate-2)]/95 p-3.5 rounded-xl border border-[var(--slate-6)] text-xs space-y-2 pointer-events-none">
+        <div class="text-xs font-medium text-[var(--slate-11)] pb-1.5 border-b border-[var(--slate-6)]">Легенда схемы</div>
+        <div class="flex items-center gap-2.5">
+          <span class="w-3 h-3 rounded-sm bg-[var(--emerald-9)] shrink-0"></span>
+          <span class="text-[var(--slate-12)]">Стартовый узел</span>
+        </div>
+        <div class="flex items-center gap-2.5">
+          <span class="w-3 h-3 rounded-sm bg-[var(--ruby-9)] shrink-0"></span>
+          <span class="text-[var(--slate-12)]">Конечный узел</span>
+        </div>
+        <div class="flex items-center gap-2.5">
+          <span class="w-3.5 h-0.5 bg-[var(--amber-9)] shrink-0"></span>
+          <span class="text-[var(--slate-12)]">Узкое место</span>
+        </div>
+        <div class="flex items-center gap-2.5">
+          <span class="w-3.5 h-0.5 bg-[var(--ruby-9)] shrink-0"></span>
+          <span class="text-[var(--slate-12)]">Цикл возврата</span>
+        </div>
+        <div class="flex items-center gap-2.5">
+          <span class="w-3.5 h-0.5 bg-[var(--slate-8)] shrink-0"></span>
+          <span class="text-[var(--slate-11)]">Прямой переход</span>
+        </div>
+      </div>
+
+      <!-- Inspector Drawer (Bottom Right Card) -->
+      <div id="inspector-card" class="hidden absolute bottom-4 right-4 z-20 w-80 bg-[var(--slate-2)]/95 rounded-xl border border-[var(--slate-7)] p-4 text-xs modal-enter">
+        <div class="flex items-center justify-between pb-2 mb-2 border-b border-[var(--slate-6)]">
+          <span id="inspector-badge" class="text-[11px] font-mono px-2 py-0.5 rounded bg-[var(--slate-3)] text-[var(--sapphire-11)] border border-[var(--slate-6)]">Элемент</span>
+          <button onclick="closeInspector()" class="text-[var(--slate-11)] hover:text-[var(--slate-12)] rounded-lg w-7 h-7 flex items-center justify-center" aria-label="Закрыть панель инспектора">
+            <svg class="w-4 h-4" fill="none" stroke="currentColor" stroke-width="1.5" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" d="M6 18L18 6M6 6l12 12"/></svg>
+          </button>
+        </div>
+        <h4 id="inspector-title" class="text-sm font-semibold text-[var(--slate-12)] mb-2 truncate">Название</h4>
+        <div id="inspector-body" class="space-y-1.5 text-[var(--slate-12)]">
+          <!-- Dynamic details -->
+        </div>
+      </div>
+
+      <!-- Mapping Modal Panel (When uploading CSV/JSON) -->
+      <div id="mapping-panel" class="hidden absolute inset-0 z-40 bg-black/60 backdrop-blur-sm flex items-center justify-center p-4">
+        <div id="mapping-dialog" class="w-full max-w-md bg-[var(--slate-2)] rounded-2xl border border-[var(--slate-7)] p-6 text-xs modal-enter">
+          <div class="flex items-center justify-between pb-3 mb-4 border-b border-[var(--slate-6)]">
+            <h3 class="text-sm font-semibold text-[var(--slate-12)]">Сопоставление колонок лога</h3>
+            <button onclick="closeMappingModal()" class="text-[var(--slate-11)] hover:text-[var(--slate-12)] rounded-lg w-8 h-8 flex items-center justify-center" aria-label="Закрыть окно сопоставления колонок">
+              <svg class="w-4 h-4" fill="none" stroke="currentColor" stroke-width="1.5" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" d="M6 18L18 6M6 6l12 12"/></svg>
+            </button>
+          </div>
+          <p class="text-[var(--slate-11)] mb-4">Укажите колонки для выделения трасс и прямого следования</p>
+          <div class="space-y-3 mb-5">
+            <div>
+              <label for="map-case" class="block text-[var(--slate-12)] mb-1 font-medium">1. Номер трассы (Case ID)</label>
+              <select id="map-case" class="w-full bg-[var(--slate-1)] border border-[var(--slate-6)] rounded-lg p-2 text-[var(--slate-12)] focus:outline-none focus:border-[var(--sapphire-9)]"></select>
+            </div>
+            <div>
+              <label for="map-act" class="block text-[var(--slate-12)] mb-1 font-medium">2. Название операции (Activity)</label>
+              <select id="map-act" class="w-full bg-[var(--slate-1)] border border-[var(--slate-6)] rounded-lg p-2 text-[var(--slate-12)] focus:outline-none focus:border-[var(--sapphire-9)]"></select>
+            </div>
+            <div>
+              <label for="map-time" class="block text-[var(--slate-12)] mb-1 font-medium">3. Метка времени (Timestamp)</label>
+              <select id="map-time" class="w-full bg-[var(--slate-1)] border border-[var(--slate-6)] rounded-lg p-2 text-[var(--slate-12)] focus:outline-none focus:border-[var(--sapphire-9)]"></select>
+            </div>
+            <div>
+              <label for="map-res" class="block text-[var(--slate-12)] mb-1 font-medium">4. Исполнитель (опционально)</label>
+              <select id="map-res" class="w-full bg-[var(--slate-1)] border border-[var(--slate-6)] rounded-lg p-2 text-[var(--slate-12)] focus:outline-none focus:border-[var(--sapphire-9)]"></select>
+            </div>
+          </div>
+          <div class="flex justify-end gap-2">
+            <button onclick="closeMappingModal()" class="px-4 h-9 rounded-lg bg-[var(--slate-3)] hover:bg-[var(--slate-4)] text-[var(--slate-12)] font-medium">Отмена</button>
+            <button onclick="applyMapping()" class="px-4 h-9 rounded-lg bg-[var(--sapphire-9)] hover:bg-[var(--sapphire-10)] text-white font-medium">Построить граф</button>
+          </div>
+        </div>
+      </div>
+
+    </div>
+  </main>
+
+  <script>
+    function toggleSidebar(forceState) {
+      const sidebar = document.getElementById('workbench-sidebar');
+      const backdrop = document.getElementById('sidebar-backdrop');
+      if (!sidebar || !backdrop) return;
+      const isOpen = !sidebar.classList.contains('-translate-x-full');
+      const shouldOpen = forceState !== undefined ? forceState : !isOpen;
+      if (shouldOpen) {
+        sidebar.classList.remove('-translate-x-full');
+        backdrop.classList.remove('hidden');
+      } else {
+        sidebar.classList.add('-translate-x-full');
+        backdrop.classList.add('hidden');
+      }
+    }
+
+    function closeMappingModal() {
+      const dlg = document.getElementById('mapping-dialog');
+      const panel = document.getElementById('mapping-panel');
+      if (dlg) dlg.classList.remove('modal-enter-active');
+      setTimeout(() => {
+        if (panel) panel.classList.add('hidden');
+      }, 180);
+    }
+  </script>
+  <script src="radix-workbench.js?v=8"></script>
+</body>
+</html>

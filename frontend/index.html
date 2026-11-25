@@ -1,0 +1,778 @@
+<!DOCTYPE html>
+<html lang="ru" class="dark">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Process Mining: Реконструкция графов бизнес-процессов</title>
+  
+  <link rel="icon" type="image/svg+xml" href="favicon.svg?v=10">
+  <link rel="stylesheet" href="radix-colors.css">
+  <script>
+    (function() {
+      const saved = localStorage.getItem('theme');
+      if (saved === 'light') {
+        document.documentElement.classList.remove('dark');
+      } else {
+        document.documentElement.classList.add('dark');
+      }
+    })();
+  </script>
+  <script src="libs/tailwind.min.js"></script>
+  <script src="libs/cytoscape.min.js"></script>
+  <script src="libs/dagre.min.js"></script>
+  <script src="libs/cytoscape-dagre.min.js"></script>
+
+  <script>
+    tailwind.config = {
+      darkMode: 'class',
+      theme: {
+        extend: {
+          colors: {
+            app: {
+              bg: 'var(--slate-1)',
+              subtle: 'var(--slate-2)',
+              card: 'var(--slate-3)',
+              hover: 'var(--slate-4)',
+              borderSubtle: 'var(--slate-6)',
+              border: 'var(--slate-7)',
+              borderHover: 'var(--slate-8)',
+              primary: 'var(--sapphire-9)',
+              primaryHover: 'var(--sapphire-10)',
+              textMuted: 'var(--slate-11)',
+              text: 'var(--slate-12)',
+            }
+          }
+        }
+      }
+    }
+  </script>
+
+  <style>
+    body {
+      background-color: var(--slate-1);
+      color: var(--slate-12);
+      font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
+    }
+    #hero-cy {
+      width: 100%;
+      height: 410px;
+      background-color: var(--slate-1);
+      background-image: radial-gradient(var(--slate-6) 1px, transparent 1px);
+      background-size: 20px 20px;
+    }
+  </style>
+</head>
+<body class="min-h-screen flex flex-col">
+
+  <!-- ==================== HEADER NAVIGATION ==================== -->
+  <header class="sticky top-0 z-50 border-b border-[var(--slate-6)] bg-[var(--slate-1)]/95 backdrop-blur-sm">
+    <div class="max-w-7xl mx-auto px-6 h-16 flex items-center justify-between">
+      
+      <!-- Brand -->
+      <div class="flex items-center gap-3">
+        <div class="w-9 h-9 rounded-lg bg-[var(--slate-2)] border border-[var(--slate-6)] flex items-center justify-center text-[var(--sapphire-9)]">
+          <svg class="w-5 h-5" viewBox="0 0 256 256" fill="currentColor" aria-hidden="true">
+            <path fill-rule="evenodd" d="M 40 28 H 120 A 16 16 0 0 1 136 44 V 92 A 16 16 0 0 1 120 108 H 40 A 16 16 0 0 1 24 92 V 44 A 16 16 0 0 1 40 28 Z M 48 52 V 84 H 112 V 52 Z"/>
+            <rect x="120" y="148" width="112" height="80" rx="16"/>
+            <path d="M 136 56 H 184 A 20 20 0 0 1 204 76 V 108 H 222 L 192 138 L 162 108 H 180 V 80 H 136 Z"/>
+            <path d="M 120 200 H 72 A 20 20 0 0 1 52 180 V 148 H 34 L 64 118 L 94 148 H 76 V 176 H 120 Z"/>
+          </svg>
+        </div>
+        <div class="flex flex-col">
+          <span class="font-semibold text-base tracking-tight text-[var(--slate-12)] leading-tight">Process Mining Workbench</span>
+          <span class="text-[11px] text-[var(--slate-11)] font-mono">ВятГУ • Кафедра ЭВМ • ИВТб-4302</span>
+        </div>
+      </div>
+
+      <!-- Navigation Links -->
+      <nav class="hidden md:flex items-center gap-8 text-sm font-medium text-[var(--slate-11)]">
+        <a href="#features" class="hover:text-[var(--slate-12)] transition-colors">Возможности</a>
+        <a href="#datasets" class="hover:text-[var(--slate-12)] transition-colors">Журналы событий</a>
+      </nav>
+
+      <!-- Action Buttons & Theme Switcher -->
+      <div class="flex items-center gap-2">
+        <button onclick="toggleLandingTheme()" id="btn-theme-toggle" class="w-9 h-9 rounded-lg bg-[var(--slate-2)] hover:bg-[var(--slate-3)] border border-[var(--slate-6)] text-[var(--slate-11)] hover:text-[var(--slate-12)] flex items-center justify-center" title="Сменить тему оформления" aria-label="Сменить тему оформления">
+          <svg id="theme-icon-sun" class="w-4 h-4 hidden" fill="none" stroke="currentColor" stroke-width="1.5" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" d="M12 3v1m0 16v1m9-9h-1M4 12H3m15.364 6.364l-.707-.707M6.343 6.343l-.707-.707m12.728 0l-.707.707M6.343 17.657l-.707.707M16 12a4 4 0 11-8 0 4 4 0 018 0z"/></svg>
+          <svg id="theme-icon-moon" class="w-4 h-4" fill="none" stroke="currentColor" stroke-width="1.5" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" d="M20.354 15.354A9 9 0 018.646 3.646 9.003 9.003 0 0012 21a9.003 9.003 0 008.354-5.646z"/></svg>
+        </button>
+
+        <a href="workbench.html" class="inline-flex items-center gap-2 px-4 h-9 rounded-lg bg-[var(--sapphire-9)] hover:bg-[var(--sapphire-10)] text-white font-medium text-xs">
+          <span>Открыть Workbench</span>
+          <svg class="w-4 h-4" fill="none" stroke="currentColor" stroke-width="1.5" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" d="M14 5l7 7m0 0l-7 7m7-7H3"/></svg>
+        </a>
+      </div>
+
+    </div>
+  </header>
+
+  <!-- ==================== HERO SECTION ==================== -->
+  <section class="relative border-b border-[var(--slate-6)] py-16 lg:py-24">
+    <div class="max-w-7xl mx-auto px-6">
+      
+      <div class="grid grid-cols-1 lg:grid-cols-12 gap-10 lg:gap-10 items-center">
+        
+        <!-- Left Column -->
+        <div class="lg:col-span-5 space-y-6">
+          
+          <h1 class="text-4xl sm:text-[44px] font-semibold tracking-tight text-[var(--slate-12)] leading-[1.08]">
+            Реконструкция графов процессов по журналам событий
+          </h1>
+
+          <p class="text-[15px] text-[var(--slate-11)] leading-relaxed">
+            Программный модуль восстановления графов прямого следования (DFG) по журналам 1С:ERP, Service Desk и банковского скоринга. Расчет задержек, поиск узких мест и экспорт схемы в BPMN 2.0.
+          </p>
+
+          <!-- CTAs -->
+          <div class="flex flex-wrap items-center gap-3 pt-1">
+            <a href="workbench.html" class="px-5 h-11 rounded-lg bg-[var(--sapphire-9)] hover:bg-[var(--sapphire-10)] text-white font-medium text-sm inline-flex items-center gap-2">
+              <span>Открыть Workbench</span>
+              <svg class="w-4 h-4" fill="none" stroke="currentColor" stroke-width="1.5" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" d="M17 8l4 4m0 0l-4 4m4-4H3"/></svg>
+            </a>
+            <a href="#datasets" class="px-5 h-11 rounded-lg bg-[var(--slate-2)] hover:bg-[var(--slate-3)] border border-[var(--slate-6)] text-[var(--slate-12)] font-medium text-sm inline-flex items-center">
+              Примеры журналов
+            </a>
+          </div>
+
+          <!-- Technical Specs Strip (Quiet Monochrome) -->
+          <div class="grid grid-cols-3 gap-4 pt-6 border-t border-[var(--slate-6)]">
+            <div>
+              <div class="text-lg font-medium font-mono tabular-nums text-[var(--slate-12)]">O(N)</div>
+              <div class="text-xs text-[var(--slate-11)] mt-0.5">Сложность парсера</div>
+            </div>
+            <div>
+              <div class="text-lg font-medium font-mono tabular-nums text-[var(--slate-12)]">IEEE 1849</div>
+              <div class="text-xs text-[var(--slate-11)] mt-0.5">Стандарт XES</div>
+            </div>
+            <div>
+              <div class="text-lg font-medium font-mono tabular-nums text-[var(--slate-12)]">BPMN 2.0</div>
+              <div class="text-xs text-[var(--slate-11)] mt-0.5">Экспорт моделей</div>
+            </div>
+          </div>
+
+        </div>
+
+        <!-- Right Column: Graph Preview Window -->
+        <div class="lg:col-span-7">
+          <div class="bg-[var(--slate-2)] border border-[var(--slate-6)] rounded-2xl overflow-hidden relative">
+            
+            <!-- Window Header -->
+            <div class="h-12 border-b border-[var(--slate-6)] bg-[var(--slate-2)] px-4 flex items-center justify-between gap-2">
+              
+              <!-- Tabs -->
+              <div class="flex items-center gap-1.5 text-xs">
+                <button onclick="setHeroPreset('1c_erp')" id="hero-tab-1c" class="px-3 py-1.5 min-h-[32px] rounded-lg font-medium bg-[var(--slate-1)] text-[var(--slate-12)] border border-[var(--slate-6)]">
+                  1С:ERP Заказы
+                </button>
+                <button onclick="setHeroPreset('servicedesk')" id="hero-tab-sd" class="px-3 py-1.5 min-h-[32px] rounded-lg font-medium text-[var(--slate-11)] hover:text-[var(--slate-12)]">
+                  Service Desk
+                </button>
+                <button onclick="setHeroPreset('bank')" id="hero-tab-bank" class="px-3 py-1.5 min-h-[32px] rounded-lg font-medium text-[var(--slate-11)] hover:text-[var(--slate-12)]">
+                  Банк (Кредиты)
+                </button>
+              </div>
+
+              <!-- Label -->
+              <span class="hidden sm:inline text-[11px] font-mono text-[var(--slate-11)]">Предпросмотр DFG</span>
+            </div>
+
+            <!-- Cytoscape Live Canvas -->
+            <div class="relative">
+              <div id="hero-cy"></div>
+
+              <!-- Quiet Telemetry Indicators -->
+              <div class="absolute top-3 left-3 z-10 flex items-center gap-2 pointer-events-none">
+                <div class="bg-[var(--slate-1)]/95 px-2.5 py-1.5 rounded-lg border border-[var(--slate-6)] text-xs flex items-center gap-2 tabular-nums">
+                  <span class="w-2 h-2 rounded-full bg-[var(--amber-9)]"></span>
+                  <span class="text-[var(--slate-11)]">Узкое место <strong id="hero-badge-delay" class="text-[var(--slate-12)] font-medium">3.6 дн</strong></span>
+                </div>
+                <div class="bg-[var(--slate-1)]/95 px-2.5 py-1.5 rounded-lg border border-[var(--slate-6)] text-xs flex items-center gap-2 tabular-nums">
+                  <span class="w-2 h-2 rounded-full bg-[var(--ruby-9)]"></span>
+                  <span class="text-[var(--slate-11)]"><strong id="hero-badge-count" class="text-[var(--slate-12)] font-medium">100</strong> <span id="hero-badge-label">циклов возврата</span></span>
+                </div>
+              </div>
+
+              <!-- Floating Canvas Controls -->
+              <div class="absolute bottom-3 right-3 z-10 flex items-center gap-1 bg-[var(--slate-2)]/95 p-1 rounded-xl border border-[var(--slate-6)] text-xs">
+                <button onclick="heroZoomIn()" class="w-8 h-8 rounded-lg flex items-center justify-center hover:bg-[var(--slate-3)] text-[var(--slate-12)] font-medium text-sm" title="Приблизить" aria-label="Приблизить граф">+</button>
+                <button onclick="heroZoomOut()" class="w-8 h-8 rounded-lg flex items-center justify-center hover:bg-[var(--slate-3)] text-[var(--slate-12)] font-medium text-sm" title="Отдалить" aria-label="Отдалить граф">-</button>
+                <div class="h-4 w-[1px] bg-[var(--slate-6)] mx-0.5"></div>
+                <button onclick="heroFit()" class="px-2.5 h-8 rounded-lg hover:bg-[var(--slate-3)] text-xs text-[var(--slate-12)] font-medium" aria-label="Вписать схему в экран">Вписать</button>
+              </div>
+            </div>
+
+            <!-- Window Footer -->
+            <div class="h-10 border-t border-[var(--slate-6)] bg-[var(--slate-2)] px-4 flex items-center justify-between text-xs text-[var(--slate-11)]">
+              <span class="font-mono text-[11px]">Поток прямого следования • Узлы можно перетаскивать</span>
+              <a href="workbench.html" class="font-medium text-[var(--sapphire-11)] hover:text-[var(--sapphire-9)] transition-colors">
+                Открыть в Workbench
+              </a>
+            </div>
+
+          </div>
+        </div>
+
+      </div>
+
+    </div>
+  </section>
+
+  <!-- ==================== CAPABILITIES (VARIED RHYTHM, QUIET ICONS) ==================== -->
+  <section id="features" class="py-16 lg:py-24 border-b border-[var(--slate-6)] bg-[var(--slate-1)]">
+    <div class="max-w-7xl mx-auto px-6">
+      
+      <div class="max-w-2xl mb-10">
+        <h2 class="text-2xl sm:text-3xl font-semibold text-[var(--slate-12)] tracking-tight">
+          Возможности модуля реконструкции
+        </h2>
+        <p class="text-[15px] text-[var(--slate-11)] mt-2.5 leading-relaxed">
+          Восстановление графов процессов по стандартам IEEE 1849 XES и BPMN 2.0.
+        </p>
+      </div>
+
+      <!-- Primary Algorithmic Row (2 Wide Cards) -->
+      <div class="grid grid-cols-1 lg:grid-cols-2 gap-4 mb-4">
+        <div class="p-6 rounded-xl bg-[var(--slate-2)] border border-[var(--slate-6)] space-y-2.5">
+          <div class="flex items-center gap-3">
+            <div class="w-8 h-8 rounded-lg bg-[var(--slate-3)] border border-[var(--slate-6)] flex items-center justify-center text-[var(--slate-11)] shrink-0">
+              <svg class="w-[18px] h-[18px]" fill="none" stroke="currentColor" stroke-width="1.5" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" d="M13 10V3L4 14h7v7l9-11h-7z"/></svg>
+            </div>
+            <h3 class="text-base font-semibold text-[var(--slate-12)]">Расчет графа DFG и Heuristic Miner</h3>
+          </div>
+          <p class="text-sm text-[var(--slate-11)] leading-relaxed pl-11">
+            Построение матрицы прямого следования со сложностью O(N) и расчетом коэффициента зависимости для отсечения случайных связей. Обработка 5 000 строк занимает менее 20 миллисекунд.
+          </p>
+        </div>
+
+        <div class="p-6 rounded-xl bg-[var(--slate-2)] border border-[var(--slate-6)] space-y-2.5">
+          <div class="flex items-center gap-3">
+            <div class="w-8 h-8 rounded-lg bg-[var(--slate-3)] border border-[var(--slate-6)] flex items-center justify-center text-[var(--slate-11)] shrink-0">
+              <svg class="w-[18px] h-[18px]" fill="none" stroke="currentColor" stroke-width="1.5" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" d="M12 6V4m0 2a2 2 0 100 4m0-4a2 2 0 110 4m-6 8a2 2 0 100-4m0 4a2 2 0 110-4m0 4v2m0-6V4m6 6v10m6-2a2 2 0 100-4m0 4a2 2 0 110-4m0 4v2m0-6V4"/></svg>
+            </div>
+            <h3 class="text-base font-semibold text-[var(--slate-12)]">Фильтрация шума на лету</h3>
+          </div>
+          <p class="text-sm text-[var(--slate-11)] leading-relaxed pl-11">
+            Регуляторы порогов отсекают редкие операции и второстепенные переходы прямо в интерфейсе, выделяя основную магистраль процесса.
+          </p>
+        </div>
+      </div>
+
+      <!-- Secondary Capabilities Row (4 Compact Tiles) -->
+      <div class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
+        <div class="p-5 rounded-xl bg-[var(--slate-2)] border border-[var(--slate-6)] space-y-2">
+          <div class="flex items-center gap-2.5">
+            <svg class="w-[18px] h-[18px] text-[var(--slate-11)] shrink-0" fill="none" stroke="currentColor" stroke-width="1.5" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" d="M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z"/></svg>
+            <h3 class="text-sm font-semibold text-[var(--slate-12)]">Поиск узких мест</h3>
+          </div>
+          <p class="text-xs text-[var(--slate-11)] leading-relaxed">
+            Вычисление средней и медианной длительности ожидания между операциями с подсветкой задержек на схеме.
+          </p>
+        </div>
+
+        <div class="p-5 rounded-xl bg-[var(--slate-2)] border border-[var(--slate-6)] space-y-2">
+          <div class="flex items-center gap-2.5">
+            <svg class="w-[18px] h-[18px] text-[var(--slate-11)] shrink-0" fill="none" stroke="currentColor" stroke-width="1.5" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15"/></svg>
+            <h3 class="text-sm font-semibold text-[var(--slate-12)]">Циклы возврата</h3>
+          </div>
+          <p class="text-xs text-[var(--slate-11)] leading-relaxed">
+            Обнаружение повторных операций (Rework) и возвратов документов на доработку внутри трасс.
+          </p>
+        </div>
+
+        <div class="p-5 rounded-xl bg-[var(--slate-2)] border border-[var(--slate-6)] space-y-2">
+          <div class="flex items-center gap-2.5">
+            <svg class="w-[18px] h-[18px] text-[var(--slate-11)] shrink-0" fill="none" stroke="currentColor" stroke-width="1.5" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z"/></svg>
+            <h3 class="text-sm font-semibold text-[var(--slate-12)]">CSV, XES и JSON</h3>
+          </div>
+          <p class="text-xs text-[var(--slate-11)] leading-relaxed">
+            Парсинг журналов IEEE 1849-2016 XES и произвольных табличных логов через маппинг колонок.
+          </p>
+        </div>
+
+        <div class="p-5 rounded-xl bg-[var(--slate-2)] border border-[var(--slate-6)] space-y-2">
+          <div class="flex items-center gap-2.5">
+            <svg class="w-[18px] h-[18px] text-[var(--slate-11)] shrink-0" fill="none" stroke="currentColor" stroke-width="1.5" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" d="M8 7h12m0 0l-4-4m4 4l-4 4m0 6H4m0 0l4 4m-4-4l4-4"/></svg>
+            <h3 class="text-sm font-semibold text-[var(--slate-12)]">Экспорт в BPMN 2.0</h3>
+          </div>
+          <p class="text-xs text-[var(--slate-11)] leading-relaxed">
+            Выгрузка модели в XML по стандарту ISO/IEC 19510 для Camunda Modeler и сохранение схемы в PNG.
+          </p>
+        </div>
+      </div>
+
+    </div>
+  </section>
+
+  <!-- ==================== DATASETS SHOWCASE ==================== -->
+  <section id="datasets" class="py-16 lg:py-20 bg-[var(--slate-2)]">
+    <div class="max-w-7xl mx-auto px-6">
+      
+      <div class="max-w-2xl mb-10">
+        <h2 class="text-2xl sm:text-3xl font-semibold text-[var(--slate-12)] tracking-tight">
+          Контрольные журналы событий
+        </h2>
+        <p class="text-[15px] text-[var(--slate-11)] mt-2.5 leading-relaxed">
+          Нажмите на нужный датасет, чтобы сразу открыть его граф в Workbench.
+        </p>
+      </div>
+
+      <div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
+        
+        <!-- Dataset 1: 1C:ERP -->
+        <div class="p-5 rounded-xl bg-[var(--slate-1)] border border-[var(--slate-6)] flex flex-col justify-between gap-4">
+          <div>
+            <div class="flex items-center justify-between gap-2 mb-2.5">
+              <h3 class="text-sm font-semibold text-[var(--slate-12)]">1С:ERP Заказы</h3>
+              <span class="text-[11px] font-mono text-[var(--slate-11)] bg-[var(--slate-2)] px-2 py-0.5 rounded border border-[var(--slate-6)]">Order-to-Cash</span>
+            </div>
+            <p class="text-xs text-[var(--slate-11)] leading-relaxed tabular-nums">
+              500 заказов, 4 993 события. Согласования, складские операции, ожидание поставок и закрытие УПД.
+            </p>
+          </div>
+          <a href="workbench.html?preset=1c_erp" class="inline-flex items-center justify-center w-full h-9 rounded-lg bg-[var(--slate-2)] hover:bg-[var(--slate-3)] border border-[var(--slate-6)] text-xs font-medium text-[var(--slate-12)]">
+            Открыть датасет
+          </a>
+        </div>
+
+        <!-- Dataset 2: Service Desk -->
+        <div class="p-5 rounded-xl bg-[var(--slate-1)] border border-[var(--slate-6)] flex flex-col justify-between gap-4">
+          <div>
+            <div class="flex items-center justify-between gap-2 mb-2.5">
+              <h3 class="text-sm font-semibold text-[var(--slate-12)]">Service Desk</h3>
+              <span class="text-[11px] font-mono text-[var(--slate-11)] bg-[var(--slate-2)] px-2 py-0.5 rounded border border-[var(--slate-6)]">ITIL / ITSM</span>
+            </div>
+            <p class="text-xs text-[var(--slate-11)] leading-relaxed tabular-nums">
+              400 инцидентов, 2 908 событий. Маршрутизация заявок, эскалация и повторное открытие.
+            </p>
+          </div>
+          <a href="workbench.html?preset=servicedesk" class="inline-flex items-center justify-center w-full h-9 rounded-lg bg-[var(--slate-2)] hover:bg-[var(--slate-3)] border border-[var(--slate-6)] text-xs font-medium text-[var(--slate-12)]">
+            Открыть датасет
+          </a>
+        </div>
+
+        <!-- Dataset 3: Bank -->
+        <div class="p-5 rounded-xl bg-[var(--slate-1)] border border-[var(--slate-6)] flex flex-col justify-between gap-4">
+          <div>
+            <div class="flex items-center justify-between gap-2 mb-2.5">
+              <h3 class="text-sm font-semibold text-[var(--slate-12)]">Банк (Кредиты)</h3>
+              <span class="text-[11px] font-mono text-[var(--slate-11)] bg-[var(--slate-2)] px-2 py-0.5 rounded border border-[var(--slate-6)]">Loan Scoring</span>
+            </div>
+            <p class="text-xs text-[var(--slate-11)] leading-relaxed tabular-nums">
+              500 заявок, 3 985 событий. Скоринг заемщиков, запросы в БКИ и проверка службы безопасности.
+            </p>
+          </div>
+          <a href="workbench.html?preset=bank_loan" class="inline-flex items-center justify-center w-full h-9 rounded-lg bg-[var(--slate-2)] hover:bg-[var(--slate-3)] border border-[var(--slate-6)] text-xs font-medium text-[var(--slate-12)]">
+            Открыть датасет
+          </a>
+        </div>
+
+        <!-- Dataset 4: IEEE XES -->
+        <div class="p-5 rounded-xl bg-[var(--slate-1)] border border-[var(--slate-6)] flex flex-col justify-between gap-4">
+          <div>
+            <div class="flex items-center justify-between gap-2 mb-2.5">
+              <h3 class="text-sm font-semibold text-[var(--slate-12)]">Эталонный XES</h3>
+              <span class="text-[11px] font-mono text-[var(--slate-11)] bg-[var(--slate-2)] px-2 py-0.5 rounded border border-[var(--slate-6)]">IEEE 1849</span>
+            </div>
+            <p class="text-xs text-[var(--slate-11)] leading-relaxed">
+              XML-лог международного формата для проверки совместимости с ProM, Disco и PM4Py.
+            </p>
+          </div>
+          <a href="workbench.html?preset=ieee_xes" class="inline-flex items-center justify-center w-full h-9 rounded-lg bg-[var(--slate-2)] hover:bg-[var(--slate-3)] border border-[var(--slate-6)] text-xs font-medium text-[var(--slate-12)]">
+            Открыть датасет
+          </a>
+        </div>
+
+      </div>
+
+    </div>
+  </section>
+
+  <!-- ==================== FOOTER ==================== -->
+  <footer class="py-8 bg-[var(--slate-1)] text-[var(--slate-11)] text-xs border-t border-[var(--slate-6)]">
+    <div class="max-w-7xl mx-auto px-6 flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4">
+      <div>
+        <p class="font-mono text-[var(--slate-12)] font-medium">ТПЖА.090301.676 ПЗ • ВятГУ, Кафедра ЭВМ</p>
+        <p class="mt-1">Курсовая работа: Разработка программного модуля автоматизированной реконструкции и визуализации графов бизнес-процессов</p>
+      </div>
+      <div class="sm:text-right">
+        <p>Студент: И.М. Осколков (ИВТб-4302-05-00)</p>
+        <p class="mt-1">Руководитель: А.С. Коржавина</p>
+      </div>
+    </div>
+  </footer>
+
+  <!-- ==================== HERO CYTOSCAPE LOGIC (LR WIDE FLOW + RADIX OKLCH DUAL THEME) ==================== -->
+  <script>
+    let heroCy = null;
+    let currentHeroPreset = '1c_erp';
+
+    function escapeXml(str) {
+      if (!str) return '';
+      return String(str)
+        .replace(/&/g, '&amp;')
+        .replace(/</g, '&lt;')
+        .replace(/>/g, '&gt;')
+        .replace(/"/g, '&quot;')
+        .replace(/'/g, '&apos;');
+    }
+
+    // Adaptive vector card generator with full Radix OKLCH Light/Dark color support
+    function createHeroNodeSvg(label, count, isStart, isEnd, isBottleneck = false) {
+      const isDark = document.documentElement.classList.contains('dark');
+
+      // Surface & borders according to Radix 12-step semantic scale
+      const bg = isDark ? '#15171e' : '#ffffff';
+      const border = isBottleneck 
+        ? (isDark ? '#f59e0b' : '#d97706') 
+        : (isDark ? '#313746' : '#d9d9e0');
+      const textTitle = isDark ? '#edeef0' : '#1c2024';
+      const textSub = isDark ? '#9ba1b0' : '#606470';
+      const pinFill = isDark ? '#3d4457' : '#c7c7d1';
+
+      // Semantic tags with Radix scale
+      let tagText = 'ЭТАП';
+      let tagBg = isDark ? 'rgba(59,130,246,0.18)' : '#eff6ff';
+      let tagColor = isDark ? '#60a5fa' : '#2563eb';
+      let iconColor = isDark ? '#60a5fa' : '#2563eb';
+
+      if (isStart) {
+        tagText = 'СТАРТ';
+        tagBg = isDark ? 'rgba(16,185,129,0.22)' : '#ecfdf5';
+        tagColor = isDark ? '#34d399' : '#059669';
+        iconColor = isDark ? '#34d399' : '#059669';
+      } else if (isEnd) {
+        tagText = 'ФИНИШ';
+        tagBg = isDark ? 'rgba(244,63,94,0.22)' : '#fff1f2';
+        tagColor = isDark ? '#fb7185' : '#e11d48';
+        iconColor = isDark ? '#fb7185' : '#e11d48';
+      } else if (isBottleneck) {
+        tagText = 'УЗКОЕ МЕСТО';
+        tagBg = isDark ? 'rgba(245,158,11,0.25)' : '#fef3c7';
+        tagColor = isDark ? '#fbbf24' : '#b45309';
+        iconColor = isDark ? '#f59e0b' : '#d97706';
+      }
+
+      // 1. Fully adaptive tag pill width: expands to fit Russian text with proper padding
+      const tagTextWidth = Math.round(tagText.length * 7.5);
+      const tagPillWidth = Math.max(52, tagTextWidth + 18);
+
+      // 2. Multi-line word-aware text wrapping
+      let line1 = label;
+      let line2 = '';
+      if (label.length > 17) {
+        const spaceIdx = label.lastIndexOf(' ', 17);
+        if (spaceIdx > 0) {
+          line1 = label.slice(0, spaceIdx);
+          line2 = label.slice(spaceIdx + 1);
+        }
+      }
+
+      // 3. Adaptive Card Width: guarantees breathing room between tag and count
+      const countStr = String(count);
+      const countWidth = Math.round(countStr.length * 6.5) + 12;
+      const maxLabelChars = Math.max(line1.length, line2.length);
+      const labelWidth = maxLabelChars * 7.5 + 44;
+      const topRowNeeded = 12 + tagPillWidth + 16 + countWidth + 12;
+      const w = Math.max(215, Math.max(topRowNeeded, labelWidth));
+      const h = 72;
+
+      const svg = `<svg xmlns="http://www.w3.org/2000/svg" width="${w}" height="${h}" viewBox="0 0 ${w} ${h}">
+        <!-- Card Frame -->
+        <rect x="1" y="1" width="${w - 2}" height="${h - 2}" rx="12" fill="${bg}" stroke="${border}" stroke-width="${isBottleneck ? 2.2 : 1.4}"/>
+        
+        <!-- Connection Ports (Left and Right for LR Flow) -->
+        <circle cx="1.5" cy="${h / 2}" r="3.5" fill="${pinFill}"/>
+        <circle cx="${w - 1.5}" cy="${h / 2}" r="3.5" fill="${pinFill}"/>
+        
+        <!-- Adaptive Header Tag Pill -->
+        <rect x="12" y="9" width="${tagPillWidth}" height="19" rx="5" fill="${tagBg}"/>
+        <text x="${12 + tagPillWidth / 2}" y="22" font-family="-apple-system, BlinkMacSystemFont, Segoe UI, Roboto, sans-serif" font-size="9" font-weight="700" fill="${tagColor}" text-anchor="middle">${tagText}</text>
+        
+        <!-- Counter Badge -->
+        <text x="${w - 12}" y="22" font-family="-apple-system, BlinkMacSystemFont, Segoe UI, Roboto, sans-serif" font-size="10.5" font-weight="600" fill="${textSub}" text-anchor="end">${escapeXml(count)}</text>
+        
+        <!-- Status Indicator Dot -->
+        <circle cx="18" cy="${line2 ? 43 : 48}" r="3.5" fill="${iconColor}"/>
+        
+        <!-- Title Text -->
+        ${line2 ? `
+          <text x="28" y="44" font-family="-apple-system, BlinkMacSystemFont, Segoe UI, Roboto, sans-serif" font-size="11.5" font-weight="600" fill="${textTitle}">${escapeXml(line1)}</text>
+          <text x="28" y="58" font-family="-apple-system, BlinkMacSystemFont, Segoe UI, Roboto, sans-serif" font-size="11.5" font-weight="600" fill="${textTitle}">${escapeXml(line2)}</text>
+        ` : `
+          <text x="28" y="52" font-family="-apple-system, BlinkMacSystemFont, Segoe UI, Roboto, sans-serif" font-size="12" font-weight="600" fill="${textTitle}">${escapeXml(line1)}</text>
+        `}
+      </svg>`;
+
+      return {
+        svg: 'data:image/svg+xml;utf8,' + encodeURIComponent(svg),
+        width: w,
+        height: h
+      };
+    }
+
+    function makeHeroNode(id, label, count, isStart, isEnd, isBottleneck = false) {
+      const card = createHeroNodeSvg(label, count, isStart, isEnd, isBottleneck);
+      return {
+        group: 'nodes',
+        data: {
+          id: id,
+          svg_image: card.svg,
+          card_width: card.width,
+          card_height: card.height
+        }
+      };
+    }
+
+    document.addEventListener('DOMContentLoaded', () => {
+      syncThemeIcons();
+      initHeroGraph();
+    });
+
+    function toggleLandingTheme() {
+      const isDark = document.documentElement.classList.toggle('dark');
+      localStorage.setItem('theme', isDark ? 'dark' : 'light');
+      syncThemeIcons();
+      applyHeroCyTheme();
+      setHeroPreset(currentHeroPreset);
+    }
+
+    function syncThemeIcons() {
+      const isDark = document.documentElement.classList.contains('dark');
+      const sun = document.getElementById('theme-icon-sun');
+      const moon = document.getElementById('theme-icon-moon');
+      if (sun && moon) {
+        if (isDark) {
+          sun.classList.add('hidden');
+          moon.classList.remove('hidden');
+        } else {
+          sun.classList.remove('hidden');
+          moon.classList.add('hidden');
+        }
+      }
+    }
+
+    function applyHeroCyTheme() {
+      if (!heroCy) return;
+      const isDark = document.documentElement.classList.contains('dark');
+      heroCy.style()
+        .selector('edge')
+        .style({
+          'line-color': isDark ? '#3d4457' : '#c7c7d1',
+          'target-arrow-color': isDark ? '#3d4457' : '#c7c7d1',
+          'color': isDark ? '#9ba1b0' : '#606470',
+          'text-background-color': isDark ? '#111318' : '#ffffff'
+        })
+        .selector('edge[?is_bottleneck]')
+        .style({
+          'line-color': isDark ? '#f59e0b' : '#d97706',
+          'target-arrow-color': isDark ? '#f59e0b' : '#d97706',
+          'color': isDark ? '#fbbf24' : '#b45309',
+          'text-background-color': isDark ? '#241804' : '#fef3c7',
+          'text-border-color': isDark ? '#f59e0b' : '#d97706'
+        })
+        .selector('edge[?is_loop]')
+        .style({
+          'line-color': isDark ? '#f43f5e' : '#e11d48',
+          'target-arrow-color': isDark ? '#f43f5e' : '#e11d48',
+          'color': isDark ? '#fda4af' : '#be123c',
+          'text-background-color': isDark ? '#2a0c12' : '#ffe4e6',
+          'text-border-color': isDark ? '#f43f5e' : '#e11d48'
+        })
+        .update();
+    }
+
+    function initHeroGraph() {
+      if (typeof cytoscape === 'undefined') return;
+      if (typeof cytoscapeDagre !== 'undefined') cytoscape.use(cytoscapeDagre);
+
+      const isDark = document.documentElement.classList.contains('dark');
+
+      heroCy = cytoscape({
+        container: document.getElementById('hero-cy'),
+        boxSelectionEnabled: false,
+        style: [
+          {
+            selector: 'node',
+            style: {
+              'shape': 'rectangle',
+              'width': 'data(card_width)',
+              'height': 'data(card_height)',
+              'background-image': 'data(svg_image)',
+              'background-fit': 'cover',
+              'background-opacity': 0,
+              'border-width': 0,
+              'label': ''
+            }
+          },
+          {
+            selector: 'edge',
+            style: {
+              'width': 'data(width)',
+              'line-color': isDark ? '#3d4457' : '#c7c7d1',
+              'target-arrow-color': isDark ? '#3d4457' : '#c7c7d1',
+              'target-arrow-shape': 'triangle',
+              'curve-style': 'bezier',
+              'arrow-scale': 1.1,
+              'font-size': '10px',
+              'font-family': 'sans-serif',
+              'font-weight': '600',
+              'color': isDark ? '#9ba1b0' : '#606470',
+              'text-background-opacity': 0.95,
+              'text-background-color': isDark ? '#111318' : '#ffffff',
+              'text-background-padding': '3px',
+              'text-background-shape': 'round-rectangle',
+              'label': 'data(label)'
+            }
+          },
+          {
+            selector: 'edge[?is_bottleneck]',
+            style: {
+              'line-color': isDark ? '#f59e0b' : '#d97706',
+              'target-arrow-color': isDark ? '#f59e0b' : '#d97706',
+              'color': isDark ? '#fbbf24' : '#b45309',
+              'width': 3.5,
+              'curve-style': 'bezier',
+              'arrow-scale': 1.15,
+              'font-size': '11px',
+              'font-weight': '700',
+              'text-background-color': isDark ? '#241804' : '#fef3c7',
+              'text-background-opacity': 1,
+              'text-background-padding': '5px',
+              'text-background-shape': 'round-rectangle',
+              'text-border-width': 1.2,
+              'text-border-color': isDark ? '#f59e0b' : '#d97706',
+              'z-index': 20
+            }
+          },
+          {
+            selector: 'edge[?is_loop]',
+            style: {
+              'line-color': isDark ? '#f43f5e' : '#e11d48',
+              'target-arrow-color': isDark ? '#f43f5e' : '#e11d48',
+              'color': isDark ? '#fda4af' : '#be123c',
+              'width': 2.8,
+              'curve-style': 'unbundled-bezier',
+              'control-point-distances': [-55],
+              'control-point-weights': [0.5],
+              'arrow-scale': 1.15,
+              'font-size': '10px',
+              'font-weight': '700',
+              'text-background-color': isDark ? '#2a0c12' : '#ffe4e6',
+              'text-background-opacity': 1,
+              'text-background-padding': '4px',
+              'text-background-shape': 'round-rectangle',
+              'text-border-width': 1.2,
+              'text-border-color': isDark ? '#f43f5e' : '#e11d48',
+              'z-index': 20
+            }
+          }
+        ]
+      });
+
+      setHeroPreset('1c_erp');
+    }
+
+    function setHeroPreset(preset) {
+      if (!heroCy) return;
+      currentHeroPreset = preset;
+
+      ['1c', 'sd', 'bank'].forEach(id => {
+        const btn = document.getElementById(`hero-tab-${id}`);
+        if (btn) btn.className = "px-3 py-1.5 min-h-[32px] rounded-lg font-medium text-[var(--slate-11)] hover:text-[var(--slate-12)]";
+      });
+
+      let elements = [];
+
+      if (preset === '1c_erp') {
+        document.getElementById('hero-tab-1c').className = "px-3 py-1.5 min-h-[32px] rounded-lg font-medium bg-[var(--slate-1)] text-[var(--slate-12)] border border-[var(--slate-6)]";
+        const bDelay = document.getElementById('hero-badge-delay');
+        const bCount = document.getElementById('hero-badge-count');
+        const bLabel = document.getElementById('hero-badge-label');
+        if (bDelay) bDelay.innerText = '3.6 дн';
+        if (bCount) bCount.innerText = '100';
+        if (bLabel) bLabel.innerText = 'циклов возврата';
+        elements = [
+          makeHeroNode('n1', 'Регистрация заказа', '500 раз', true, false),
+          makeHeroNode('n2', 'Согласование скидки', '600 раз', false, false),
+          makeHeroNode('n3', 'Отклонение клиентом', '100 раз', false, false),
+          makeHeroNode('n4', 'Ожидание поставки', '67 раз', false, false, true),
+          makeHeroNode('n5', 'Сборка и оплата', '446 раз', false, false),
+          makeHeroNode('n6', 'Подписание УПД', '446 раз', false, true),
+          
+          { group: 'edges', data: { source: 'n1', target: 'n2', label: '500 раз', width: 4.5 } },
+          { group: 'edges', data: { source: 'n1', target: 'n4', label: '67 раз', width: 2.2 } },
+          { group: 'edges', data: { source: 'n2', target: 'n3', label: '100 раз', width: 2.5 } },
+          { group: 'edges', data: { source: 'n3', target: 'n2', label: 'Rework 100x', width: 2.8, is_loop: true } },
+          { group: 'edges', data: { source: 'n4', target: 'n5', label: '3.6 дн', width: 3.5, is_bottleneck: true } },
+          { group: 'edges', data: { source: 'n2', target: 'n5', label: '379 раз', width: 3.8 } },
+          { group: 'edges', data: { source: 'n3', target: 'n6', label: '54 раз', width: 2.0 } },
+          { group: 'edges', data: { source: 'n5', target: 'n6', label: '446 раз', width: 4.5 } }
+        ];
+      } else if (preset === 'servicedesk') {
+        document.getElementById('hero-tab-sd').className = "px-3 py-1.5 min-h-[32px] rounded-lg font-medium bg-[var(--slate-1)] text-[var(--slate-12)] border border-[var(--slate-6)]";
+        const bDelay = document.getElementById('hero-badge-delay');
+        const bCount = document.getElementById('hero-badge-count');
+        const bLabel = document.getElementById('hero-badge-label');
+        if (bDelay) bDelay.innerText = '14.9 ч';
+        if (bCount) bCount.innerText = '33';
+        if (bLabel) bLabel.innerText = 'запроса логов';
+        elements = [
+          makeHeroNode('sd1', 'Регистрация инцидента', '400 раз', true, false),
+          makeHeroNode('sd2', 'Взятие в работу Tier 1', '367 раз', false, false),
+          makeHeroNode('sd3', 'Запрос логов у юзера', '33 раз', false, false, true),
+          makeHeroNode('sd4', 'Развертывание патча', '154 раз', false, false),
+          makeHeroNode('sd5', 'Закрытие инцидента', '400 раз', false, true),
+          
+          { group: 'edges', data: { source: 'sd1', target: 'sd2', label: '367 раз', width: 4.2 } },
+          { group: 'edges', data: { source: 'sd1', target: 'sd3', label: '33 раз', width: 2.2 } },
+          { group: 'edges', data: { source: 'sd2', target: 'sd4', label: '121 раз', width: 3.0 } },
+          { group: 'edges', data: { source: 'sd3', target: 'sd4', label: '14.9 ч', width: 3.5, is_bottleneck: true } },
+          { group: 'edges', data: { source: 'sd2', target: 'sd5', label: '246 раз', width: 3.8 } },
+          { group: 'edges', data: { source: 'sd4', target: 'sd5', label: '154 раз', width: 3.2 } }
+        ];
+      } else {
+        document.getElementById('hero-tab-bank').className = "px-3 py-1.5 min-h-[32px] rounded-lg font-medium bg-[var(--slate-1)] text-[var(--slate-12)] border border-[var(--slate-6)]";
+        const bDelay = document.getElementById('hero-badge-delay');
+        const bCount = document.getElementById('hero-badge-count');
+        const bLabel = document.getElementById('hero-badge-label');
+        if (bDelay) bDelay.innerText = '2.1 дн';
+        if (bCount) bCount.innerText = '119';
+        if (bLabel) bLabel.innerText = 'запросов 2-НДФЛ';
+        elements = [
+          makeHeroNode('b1', 'Подача онлайн заявки', '500 раз', true, false),
+          makeHeroNode('b2', 'Скоринг и БКИ', '381 раз', false, false),
+          makeHeroNode('b3', 'Запрос 2-НДФЛ', '119 раз', false, false, true),
+          makeHeroNode('b4', 'Проверка СБ банка', '412 раз', false, false),
+          makeHeroNode('b5', 'Зачисление средств', '445 раз', false, true),
+          
+          { group: 'edges', data: { source: 'b1', target: 'b2', label: '381 раз', width: 4.2 } },
+          { group: 'edges', data: { source: 'b1', target: 'b3', label: '119 раз', width: 2.5 } },
+          { group: 'edges', data: { source: 'b2', target: 'b4', label: '293 раз', width: 3.8 } },
+          { group: 'edges', data: { source: 'b3', target: 'b4', label: '2.1 дн', width: 3.5, is_bottleneck: true } },
+          { group: 'edges', data: { source: 'b4', target: 'b5', label: '412 раз', width: 4.2 } }
+        ];
+      }
+
+      heroCy.elements().remove();
+      heroCy.add(elements);
+
+      // Horizontal Left-to-Right layout with generous node separation
+      heroCy.layout({
+        name: 'dagre',
+        rankDir: 'LR',
+        nodeSep: 55,
+        rankSep: 85,
+        animate: true,
+        animationDuration: 300,
+        fit: true,
+        padding: 24
+      }).run();
+    }
+
+    function heroZoomIn() { if (heroCy) heroCy.zoom(heroCy.zoom() * 1.2); }
+    function heroZoomOut() { if (heroCy) heroCy.zoom(heroCy.zoom() * 0.8); }
+    function heroFit() { if (heroCy) heroCy.fit(null, 28); }
+  </script>
+
+</body>
+</html>
